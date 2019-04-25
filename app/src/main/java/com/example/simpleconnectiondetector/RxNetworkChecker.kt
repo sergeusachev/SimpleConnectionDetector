@@ -1,38 +1,39 @@
 package com.example.simpleconnectiondetector
 
-import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.net.*
-import android.os.Build
 import android.util.Log
 import io.reactivex.Observable
-import io.reactivex.Single
-import java.io.IOException
-import java.net.InetSocketAddress
-import java.net.Socket
 
 
 private val DEBUG_TAG = RxNetworkChecker::class.java.simpleName
 
 class RxNetworkChecker(private val context: Context) {
 
+    interface NetworkCapability
+
+    inner class NetworkData(
+            val transportName: String,
+            val upstreamKbps: Int,
+            val downstreamKbs: Int
+    ) : NetworkCapability
+
+    inner class NetworkDummy : NetworkCapability
+
     private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-    fun networkRuntimeStatusObservable(): Observable<Boolean> {
+    /*fun networkRuntimeStatusObservable(): Observable<Boolean> {
         return networkStatusObservableNewApi()
-    }
+    }*/
 
-    private fun networkStatusObservableNewApi(): Observable<Boolean> {
+   /* private fun networkStatusObservableNewApi(): Observable<NetworkCapability> {
         return createNetworkChangeObservable().startWith(Unit)
-            .doOnNext { Log.d(DEBUG_TAG, "Network status changed!") }
-            .flatMapSingle { createConnectSocketSingle() }
-            .doOnNext { Log.d(DEBUG_TAG, "Connection to Socket: $it") }
-    }
+            //.doOnNext { Log.d(DEBUG_TAG, "Network status changed!") }
+            //.flatMapSingle { createConnectSocketSingle() }
+            //.doOnNext { Log.d(DEBUG_TAG, "Connection to Socket: $it") }
+    }*/
 
-    private fun createNetworkChangeObservable(): Observable<Unit> {
+    fun createNetworkChangeObservable(): Observable<Unit> {
         val request = NetworkRequest.Builder()
         request.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 
@@ -42,44 +43,62 @@ class RxNetworkChecker(private val context: Context) {
                 override fun onAvailable(network: Network) {
                     Log.d(DEBUG_TAG, "onAvailable()")
                     super.onAvailable(network)
-                    it.onNext(Unit)
-                }
-
-                override fun onLosing(network: Network?, maxMsToLive: Int) {
-                    Log.d(DEBUG_TAG, "onLosing()")
-                    super.onLosing(network, maxMsToLive)
-                    it.onNext(Unit)
-                }
-
-                override fun onUnavailable() {
-                    Log.d(DEBUG_TAG, "onUnavailable()")
-                    super.onUnavailable()
-                    it.onNext(Unit)
+                    //it.onNext(Unit)
                 }
 
                 override fun onCapabilitiesChanged(network: Network?, networkCapabilities: NetworkCapabilities?) {
                     Log.d(DEBUG_TAG, "onCapabilitiesChanged()")
                     super.onCapabilitiesChanged(network, networkCapabilities)
-                    it.onNext(Unit)
+
+                    if (networkCapabilities != null) {
+                        val hasWiFiTransport = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                        val hasCellularTransport = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+                        Log.d(DEBUG_TAG, "WiFi transport: $hasWiFiTransport")
+                        Log.d(DEBUG_TAG, "Cellular transport: $hasCellularTransport")
+
+                        Log.d(DEBUG_TAG, "Upstream Bandwidth: ${networkCapabilities.linkUpstreamBandwidthKbps}")
+                        Log.d(DEBUG_TAG, "Downstream Bandwidth: ${networkCapabilities.linkDownstreamBandwidthKbps}")
+
+
+
+                        it.onNext(Unit)
+                    } else {
+                        Log.d(DEBUG_TAG, "NetworkCapabilities is NULL")
+                    }
+
+
                 }
 
                 override fun onLinkPropertiesChanged(network: Network?, linkProperties: LinkProperties?) {
                     Log.d(DEBUG_TAG, "onLinkPropertiesChanged()")
                     super.onLinkPropertiesChanged(network, linkProperties)
-                    it.onNext(Unit)
+                    //it.onNext(Unit)
+                }
+
+                override fun onLosing(network: Network?, maxMsToLive: Int) {
+                    Log.d(DEBUG_TAG, "onLosing()")
+                    super.onLosing(network, maxMsToLive)
+                    //it.onNext(Unit)
                 }
 
                 override fun onLost(network: Network) {
                     Log.d(DEBUG_TAG, "onLost()")
                     super.onLost(network)
-                    it.onNext(Unit)
+                    //it.onNext(Unit)
                 }
+
+                override fun onUnavailable() {
+                    Log.d(DEBUG_TAG, "onUnavailable()")
+                    super.onUnavailable()
+                    //it.onNext(Unit)
+                }
+
             })
             it.setCancellable {  }
         }
     }
 
-    private fun createConnectSocketSingle(): Single<Boolean> {
+    /*private fun createConnectSocketSingle(): Single<Boolean> {
         return Single.fromCallable<Boolean> {
             try {
                 val timeoutMillis = 1500
@@ -92,5 +111,5 @@ class RxNetworkChecker(private val context: Context) {
                 false
             }
         }
-    }
+    }*/
 }
