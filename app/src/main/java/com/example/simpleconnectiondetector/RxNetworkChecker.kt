@@ -2,6 +2,7 @@ package com.example.simpleconnectiondetector
 
 import android.content.Context
 import android.net.*
+import android.telephony.TelephonyManager
 import android.util.Log
 import io.reactivex.Observable
 
@@ -18,26 +19,15 @@ class RxNetworkChecker(private val context: Context) {
             val downstreamKbs: Int
     ) : NetworkCapability
 
-    inner class NetworkDummy : NetworkCapability
+    inner class NoNetworkCapabilities : NetworkCapability
 
     private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-    /*fun networkRuntimeStatusObservable(): Observable<Boolean> {
-        return networkStatusObservableNewApi()
-    }*/
-
-   /* private fun networkStatusObservableNewApi(): Observable<NetworkCapability> {
-        return createNetworkChangeObservable().startWith(Unit)
-            //.doOnNext { Log.d(DEBUG_TAG, "Network status changed!") }
-            //.flatMapSingle { createConnectSocketSingle() }
-            //.doOnNext { Log.d(DEBUG_TAG, "Connection to Socket: $it") }
-    }*/
-
-    fun createNetworkChangeObservable(): Observable<Unit> {
+    fun createNetworkChangeObservable(): Observable<NetworkCapability> {
         val request = NetworkRequest.Builder()
         request.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 
-        return Observable.create<Unit> {
+        return Observable.create<NetworkCapability> {
             connectivityManager.registerNetworkCallback(request.build(), object : ConnectivityManager.NetworkCallback() {
 
                 override fun onAvailable(network: Network) {
@@ -53,20 +43,24 @@ class RxNetworkChecker(private val context: Context) {
                     if (networkCapabilities != null) {
                         val hasWiFiTransport = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
                         val hasCellularTransport = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                        Log.d(DEBUG_TAG, "WiFi transport: $hasWiFiTransport")
-                        Log.d(DEBUG_TAG, "Cellular transport: $hasCellularTransport")
-
-                        Log.d(DEBUG_TAG, "Upstream Bandwidth: ${networkCapabilities.linkUpstreamBandwidthKbps}")
-                        Log.d(DEBUG_TAG, "Downstream Bandwidth: ${networkCapabilities.linkDownstreamBandwidthKbps}")
 
 
+                        val transportName = when {
+                            hasWiFiTransport -> "WIFI"
+                            hasCellularTransport -> "CELL"
+                            else -> "NONE"
+                        }
 
-                        it.onNext(Unit)
+                        val networkData = NetworkData(
+                                transportName = transportName,
+                                upstreamKbps = networkCapabilities.linkUpstreamBandwidthKbps,
+                                downstreamKbs = networkCapabilities.linkDownstreamBandwidthKbps
+                        )
+
+                        it.onNext(networkData)
                     } else {
-                        Log.d(DEBUG_TAG, "NetworkCapabilities is NULL")
+                        it.onNext(NoNetworkCapabilities())
                     }
-
-
                 }
 
                 override fun onLinkPropertiesChanged(network: Network?, linkProperties: LinkProperties?) {
